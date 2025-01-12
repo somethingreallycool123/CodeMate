@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="CodeAssist",  # The name of your package
+    name="code_assist",  # The name of your package
     version="0.1.0",    # The version of your package
     packages=find_packages(),  # Automatically find all the subpackages in the code_assist directory
     install_requires=[  # List of dependencies that need to be installed
