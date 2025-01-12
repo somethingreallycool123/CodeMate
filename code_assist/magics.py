@@ -5,9 +5,12 @@ from . import core
 import sys
 from io import StringIO
 import traceback
+from .providers import config, LLMProvider,call_openai,call_gemini,call_anthropic,call_local_transformers,call_huggingface_hub
+from .core import clean_code_output
 
 @magics_class
 class CodeAssistMagics(Magics):
+    
     """Magic commands for CodeAssist."""
     
     @line_magic
@@ -35,34 +38,48 @@ class CodeAssistMagics(Magics):
         args = line.split()
         if not args:
             return "Usage: %set_llm_provider <provider> [model_path] [options]"
-            
+
         provider_name = args[0].lower()
         if provider_name not in [p.value for p in providers.LLMProvider]:
             return f"Invalid provider. Choose from: {', '.join(p.value for p in providers.LLMProvider)}"
 
         providers.config.provider = providers.LLMProvider(provider_name)
-        
+
+        model_path = None
         if len(args) > 1:
             model_path = args[1]
-            if provider_name == "transformers_local":
+            providers.config.api_keys[provider_name]["model"] = model_path
+        if provider_name == "transformers_local":
+            if model_path:
                 if providers.load_model(model_path):
-                    return f"Local model loaded successfully"
-                return "Failed to load model"
-            elif provider_name == "transformers_download":
+                    return f"Local model '{model_path}' loaded successfully"
+                return f"Failed to load model '{model_path}'"
+        elif provider_name == "transformers_download":
+            if model_path:
                 try:
                     load_8bit = "--8bit" in args
                     device = next((arg.split("=")[1] for arg in args if arg.startswith("--device=")), "auto")
-                    
+
                     model_path = providers.download_model(model_path)
                     if providers.load_model(model_path, device=device, load_in_8bit=load_8bit):
-                        return f"Model downloaded and loaded successfully"
-                    return "Failed to load model"
+                        return f"Model '{model_path}' downloaded and loaded successfully"
+                    return f"Failed to load model '{model_path}'"
                 except Exception as e:
                     return f"Error: {e}"
             else:
+                return "Model path is required for transformers_download provider."
+        else:
+            if model_path:
                 providers.config.model_name = model_path
+            else:
+                return "No model path provided."
 
-        return f"Provider set to {provider_name}"
+        if model_path is not None:
+            return f"Provider set to {provider_name}. Model set to {model_path}"
+        else:
+            return f"Provider set to {provider_name}"
+
+
 
     @line_magic
     def analyze_code(self, line):
@@ -73,11 +90,46 @@ class CodeAssistMagics(Magics):
             
         try:
             code = core.extract_code_from_notebook(notebook_path)
+            
             global context_tree
             context_tree = core.analyze_code(code)
+            context_summary = "\n".join([
+                f"Function: {func}\nVariables: {', '.join(details['variables'])}\nBody:\n{details['body']}"
+                for func, details in context_tree.items()
+            ])
+            
             return "Code analysis complete"
         except Exception as e:
             return f"Error analyzing code: {e}"
+
+
+    @line_magic
+    def generate_code(self, line):
+        """Magic command to generate code."""
+        if not config.provider:
+            return "Please set up a provider first using %set_llm_provider"
+
+        function_name = line.strip()
+        if not context_tree:
+            return "Context tree not built. Use %analyze_code '<notebook_path>' to build it."
+
+        prompt = f"Generate Python code for a function named '{function_name}' considering the context provided."
+
+        if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
+            return call_local_transformers(prompt)
+        elif config.provider == LLMProvider.TRANSFORMERS_HUB:
+            return call_huggingface_hub(prompt)
+        elif config.provider == LLMProvider.OPENAI:
+            return call_openai(prompt)
+        elif config.provider == LLMProvider.ANTHROPIC:
+            return call_anthropic(prompt)
+        elif config.provider == LLMProvider.GEMINI:
+            return call_gemini(prompt)
+        elif config.provider == LLMProvider.TRANSFORMERS_DOWNLOAD:
+            return call_local_transformers(prompt)  
+        else:
+            return "Provider not implemented" 
+
 
     @cell_magic
     def debug_cell(self, line, cell):
@@ -104,16 +156,16 @@ class CodeAssistMagics(Magics):
             print("\nAnalyzing error and suggesting solutions...")
             prompt = f"""Given this Python code:
 
-{cell}
+    {cell}
 
-The code produced this error:
-{error_msg}
+    The code produced this error:
+    {error_msg}
 
-Please analyze the error and suggest a solution. Focus on:
-1. What specifically caused the error
-2. How to fix it
-3. Any best practices or alternative approaches
-"""
+    Please analyze the error and suggest a solution. Focus on:
+    1. What specifically caused the error
+    2. How to fix it
+    3. Any best practices or alternative approaches
+    """
             
             provider = providers.config.provider
             if provider == providers.LLMProvider.OPENAI:
