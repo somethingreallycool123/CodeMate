@@ -78,6 +78,10 @@ Set up a locally running model as provider:
 ```python
 %set_llm_provider transformers_download facebook/opt-350m --8bit
 ```
+OR
+```python
+%set_llm_provider transformers_local ./models/my_model
+```
 Analyze the current notebook:
 ```python
 
