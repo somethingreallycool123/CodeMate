@@ -1,4 +1,4 @@
-# CodeAssist: AI-Powered Jupyter Notebook Assistant
+# CodeMate: AI-Powered Jupyter Notebook Assistant
 
 **CodeAssist** is a Jupyter notebook extension that leverages powerful AI models for code assistance, debugging, and generation. It supports multiple Large Language Model (LLM) providers, including OpenAI, Anthropic, Google Gemini, and local models via Hugging Face, bringing a versatile range of tools right to your coding environment.
 
