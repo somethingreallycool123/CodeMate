@@ -21,7 +21,7 @@ pip install code_assist
 ```
 Install CodeAssist via git clone:
 ```bash
-git clone https://github.com/somethingreallycool123/CodeAssist
+git clone https://github.com/somethingreallycool123/CodeAssist.git
 pip install -e .
 ```
 
