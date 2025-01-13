@@ -1,6 +1,6 @@
 # CodeMate: AI-Powered Jupyter Notebook Assistant
 
-**CodeAssist** is a Jupyter notebook extension that leverages powerful AI models for code assistance, debugging, and generation. It supports multiple Large Language Model (LLM) providers, including OpenAI, Anthropic, Google Gemini, and local models via Hugging Face, bringing a versatile range of tools right to your coding environment.
+**CodeMate** is a Jupyter notebook extension that leverages powerful AI models for code assistance, debugging, and generation. It supports multiple Large Language Model (LLM) providers, including OpenAI, Anthropic, Google Gemini, and local models via Hugging Face, bringing a versatile range of tools right to your coding environment.
 
 ## Features
 
@@ -17,12 +17,12 @@
 Install CodeAssist via `pip`:
 
 ```bash
-pip install code_assist
+pip install codemate_ai
 ```
 Install CodeAssist via git clone:
 ```bash
-git clone https://github.com/somethingreallycool123/CodeAssist.git
-pip install -e .
+git clone https://github.com/somethingreallycool123/CodeMate.git
+
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ pip install -e .
 ```python
 
 
-%load_ext code_assist
+%load_ext codemate_ai
 ```
 ### Set up your preferred LLM provider:
 
@@ -122,8 +122,8 @@ Change the persona of the LLM:
 ## Project Structure
 ```markdown
 
-CodeAssist/
-├── code_assist/
+CodeMate/
+├── codemate_ai/
 │   ├── __init__.py
 │   ├── core.py
 │   ├── magics.py
