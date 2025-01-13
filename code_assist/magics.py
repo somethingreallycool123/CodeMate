@@ -6,12 +6,47 @@ import sys
 from io import StringIO
 import traceback
 from .providers import config, LLMProvider,call_openai,call_gemini,call_anthropic,call_local_transformers,call_huggingface_hub
-from .core import clean_code_output
+from .core import clean_code_output,set_style,set_persona,get_persona
 
 @magics_class
 class CodeAssistMagics(Magics):
     
     """Magic commands for CodeAssist."""
+
+    @line_magic
+    def set_code_theme(self,style):
+        """
+        Magic function to set the Pygments style dynamically.
+
+        Usage:
+        %set_code_theme <style_name>
+        """
+        try:
+            if len(style) == 0:
+                print("Check available styles at https://pygments.org/styles/")
+
+            else:
+                set_style(style)
+
+            
+        except ValueError as e:
+            print(e)
+
+    @line_magic
+    def set_persona(self,persona):
+        """
+        Magic function to set the LLM persona dynamically.
+
+        Usage:
+        %set_persona <persona>
+        
+        Example:
+        %set_persona friendly
+        """
+        try:
+            set_persona(persona)
+        except ValueError as e:
+            print(e)        
     
     @line_magic
     def set_api_key(self, line):
@@ -112,8 +147,14 @@ class CodeAssistMagics(Magics):
         function_name = line.strip()
         if not context_tree:
             return "Context tree not built. Use %analyze_code '<notebook_path>' to build it."
+        
+        current_persona = get_persona()
+        
+        
+        prompt = f"Generate Python code for a function named '{function_name}' considering the context of the codebase provided: {context_tree}.{current_persona}. No need to mention you have been provided context about the whole code "
 
-        prompt = f"Generate Python code for a function named '{function_name}' considering the context provided."
+
+        
 
         if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
             return call_local_transformers(prompt)
@@ -154,6 +195,7 @@ class CodeAssistMagics(Magics):
         
         if error_msg:
             print("\nAnalyzing error and suggesting solutions...")
+            current_persona = get_persona()
             prompt = f"""Given this Python code:
 
     {cell}
@@ -161,10 +203,11 @@ class CodeAssistMagics(Magics):
     The code produced this error:
     {error_msg}
 
-    Please analyze the error and suggest a solution. Focus on:
-    1. What specifically caused the error
-    2. How to fix it
-    3. Any best practices or alternative approaches
+    only use the context tree if necessary: 
+
+    {context_tree}
+
+    {current_persona} and give corrected code
     """
             
             provider = providers.config.provider
