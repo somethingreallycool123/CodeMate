@@ -18,7 +18,7 @@ setup(
         "astor",
         "pygments"
     ],
-    entry_points={  l
+    entry_points={  
         "console_scripts": [
             "code-assist=code_assist.main:main",  
         ],
