@@ -20,7 +20,7 @@ setup(
     ],
     entry_points={  
         "console_scripts": [
-            "code-assist=code_assist.main:main",  
+            "code_assist=code_assist.main:main",  
         ],
     },
     classifiers=[  
