@@ -9,6 +9,7 @@
 - 🐛 **AI-Powered Debugging**: Get suggestions to fix errors directly within the notebook.
 - ✨ **Code Generation**: Generate new code based on your current project context.
 - 📱 **Local Model Support**: Run models locally using Hugging Face’s Transformers library.
+- 📱 **Customization**: Customize the look and feel of the interface and the LLM interacting with.
 - 🚀 **Easy Integration**: Effortlessly integrate with your Jupyter notebooks for enhanced productivity.
 
 ## Installation
@@ -16,7 +17,12 @@
 Install CodeAssist via `pip`:
 
 ```bash
-pip install codeassist
+pip install code_assist
+```
+Install CodeAssist via git clone:
+```bash
+git clone https://github.com/somethingreallycool123/CodeAssist
+pip install -e .
 ```
 
 ## Quick Start
@@ -24,7 +30,7 @@ pip install codeassist
 ```python
 
 
-%load_ext codeassist
+%load_ext code_assist
 ```
 ### Set up your preferred LLM provider:
 
@@ -65,7 +71,10 @@ Use an already downloaded model:
 %analyze_code: Analyze and build context from your notebook’s code.
 %generate_code: Generate new code based on the current context.
 %%debug_cell: Debug a cell with AI assistance.
+%set_code_theme: Change the background theme of the code solutions.
+%set_persona: Change the LLM behaviour to various types including but not limited to detailed, consise, beginnerfriendly etc.
 ```
+To understand each individual magic command functionality and operations, see [Magic function Documentation].
 
 ## Example Usage
 Set up OpenAI as the provider:
@@ -100,6 +109,15 @@ def process_data(df):
     result = df.groupby('category').mean()
     return result['value'] / 0  # Intentional error
 ```
+Change the background theme:
+```python
+%set_code_theme rrt
+```
+Change the persona of the LLM:
+```python
+%set_persona expert
+```
+
 
 ## Project Structure
 ```markdown
