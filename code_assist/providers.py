@@ -7,10 +7,11 @@ import requests
 import json
 from typing import Optional, Dict, Any
 import logging
-from .core import clean_code_output
+from .core import clean_code_output, styled_code,display_highlighted_code
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class LLMProvider(Enum):
     OPENAI = "openai"
@@ -101,7 +102,7 @@ def call_gemini(prompt: str) -> str:
         model = genai.GenerativeModel(config.api_keys["gemini"]["model"])
         response = model.generate_content(prompt)
         test = response.text.strip()
-        return clean_code_output(test)
+        return display_highlighted_code(test)
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
         return f"Error: {str(e)}"
