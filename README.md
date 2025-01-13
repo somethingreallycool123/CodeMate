@@ -74,7 +74,7 @@ Use an already downloaded model:
 %set_code_theme: Change the background theme of the code solutions.
 %set_persona: Change the LLM behaviour to various types including but not limited to detailed, consise, beginnerfriendly etc.
 ```
-To understand each individual magic command functionality and operations, see [Magic function Documentation].
+To understand each individual magic command functionality and operations, see [Magic function Documentation](magic_func_documentation.md).
 
 ## Example Usage
 Set up OpenAI as the provider:
