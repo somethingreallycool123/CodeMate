@@ -20,7 +20,7 @@ setup(
     ],
     entry_points={  
         "console_scripts": [
-            "code_assist=code_assist.main:main",  
+            "codemate_ai=codemate_ai.main:main",  
         ],
     },
     classifiers=[  
