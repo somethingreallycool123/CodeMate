@@ -19,6 +19,8 @@ from pygments.formatters import HtmlFormatter
 
 
 current_style = 'rrt'
+
+
 current_persona = "normal"
 
 def set_style(style):
@@ -37,37 +39,125 @@ def set_style(style):
     except Exception:
         raise ValueError(f"Style '{style}' is not valid. Check available styles at https://pygments.org/styles/")
 
-def display_highlighted_code(code, language='python', style='rrt'):
+from pygments import highlight
+from pygments.lexers import PythonLexer, JsonLexer, BashLexer, guess_lexer
+from pygments.formatters import HtmlFormatter
+from IPython.display import HTML, display, Markdown
+
+
+from IPython.display import display, Markdown, HTML
+from pygments import highlight
+from pygments.lexers import PythonLexer, guess_lexer
+from pygments.formatters import HtmlFormatter
+
+def display_highlighted_code(output, default_language='python'):
     """
-    Displays syntax-highlighted code in a Jupyter Notebook using Pygments.
+    Automatically displays the LLM output as either syntax-highlighted code or Markdown.
 
     Parameters:
-    - code (str): The code to display.
-    - language (str): The programming language for syntax highlighting. Default is 'python'.
-    - style (str): The Pygments style for highlighting. Default is 'rrt'.
-
-    Supported styles: https://pygments.org/styles/
+    - output (str): The text output from the LLM to process.
+    - default_language (str): Default language for syntax highlighting if code is detected but ambiguous. Default is 'python'.
     """
-    # Remove triple backticks and language specification from the code
-    lines = code.splitlines()
-    if lines and lines[0].startswith("```"):
-        lines = lines[1:]  # Remove the first line if it's ```
-    if lines and lines[-1].startswith("```"):
-        lines = lines[:-1]  # Remove the last line if it's ```
-    clean_code = "\n".join(lines)
+    global current_style  # Use the global `current_style` dynamically
+    
+    # Strip leading/trailing whitespace
+    output = output.strip()
 
-    # Select the appropriate lexer based on the language
-    if language.lower() == 'python':
+    # Check if the output looks like Markdown
+    if output.startswith('#') or output.startswith('*') or output.startswith('-') or output.startswith('>') or output.startswith('['):
+        # Apply CSS styles to make Markdown text consistent and professional
+        styled_output = f"""
+        <style>
+            .markdown-text {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+                color: #333;
+            }}
+        </style>
+        <div class="markdown-text">
+            {output}
+        </div>
+        """
+        display(HTML(styled_output))
+        return
+
+    # Detect if output is enclosed in ``` or ```language
+    if output.startswith("```") and output.endswith("```"):
+        # Extract the language if specified
+        lines = output.splitlines()
+        first_line = lines[0].strip("`")
+        if first_line:  # Language is explicitly mentioned (e.g., ```python)
+            language = first_line.lower()
+            code = "\n".join(lines[1:-1])  # Remove backticks
+        else:  # No language specified (e.g., just ```)
+            language = default_language
+            code = "\n".join(lines[1:-1])  # Remove backticks
+
+        # Highlight the code
+        _highlight_and_display_code(code, language)
+        return
+
+    # Attempt to auto-detect language if not explicitly specified
+    try:
+        lexer = guess_lexer(output)
+        formatter = HtmlFormatter(style=current_style, noclasses=True)  # Use the global `current_style`
+        highlighted_code = highlight(output, lexer, formatter)
+        display(HTML(highlighted_code))
+    except Exception:
+        # If language detection fails, fall back to Markdown
+        styled_output = f"""
+        <style>
+            .markdown-text {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+                color: #333;
+            }}
+        </style>
+        <div class="markdown-text">
+            {output}
+        </div>
+        """
+        display(HTML(styled_output))
+
+
+def _highlight_and_display_code(code, language):
+    """
+    Internal helper to highlight code based on the language and style with smaller font.
+    """
+    global current_style  # Use the global `current_style` dynamically
+    from pygments.lexers import get_lexer_by_name
+
+    try:
+        lexer = get_lexer_by_name(language)
+    except Exception:
+        # If the language is unsupported, fall back to the default
         lexer = PythonLexer()
-    else:
-        raise ValueError(f"Language '{language}' is not supported yet.")
-    
-    # Format the code with the chosen style
-    formatter = HtmlFormatter(style=current_style, noclasses=True)
-    highlighted_code = highlight(clean_code, lexer, formatter)
-    
-    # Display the highlighted code
-    display(HTML(highlighted_code))
+
+    # Apply smaller font size using custom CSS
+    formatter = HtmlFormatter(style=current_style, noclasses=True, wrapcode=True)
+    highlighted_code = highlight(code, lexer, formatter)
+    styled_code = f"""
+    <style>
+        .code-container {{
+            font-size: 12px;  /* Smaller font size for code */
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-x: auto;
+        }}
+    </style>
+    <div class="code-container">
+        {highlighted_code}
+    </div>
+    """
+    display(HTML(styled_code))
+
+
+
 
 
 def set_persona(mode):
@@ -78,38 +168,20 @@ def set_persona(mode):
     - mode (str): The mode to set (e.g., 'friendly', 'detailed', 'concise', 'normal').
     """
     global current_persona
-    valid_modes = ['beginnerfriendly', 'detailed', 'concise', 'normal','technical', 'expert', 'creative']
+    valid_modes = ['beginnerfriendly', 'detailed', 'concise', 'normal', 'technical', 'expert', 'creative']
     if mode not in valid_modes:
         raise ValueError(f"Invalid mode: '{mode}'. Valid modes are: {', '.join(valid_modes)}")
-    mode_def ={
-    "beginnerfriendly": (
-        "Explain the concept in the simplest terms possible  "
-        "Use relatable analogies, step-by-step explanations, and avoid technical jargon. you may Include examples to help clarify. All explaination must be wrapped in code only using ''' "
-    ),
-    "detailed": (
-        "Provide an in-depth explanation of the concept, including all relevant details, context, and examples. "
-        "Cover edge cases, best practices, and common pitfalls. Assume the reader wants a thorough understanding of the topic. All of this should ideally be wrapped in the code onyl and use the ''' to elaborate on topics inside the code only"
-    ),
-    "concise": (
-        "Focus only on the code and if very necessary Explain the concept in as few words as possible while still being clear and accurate. "
-        "Focus only on the key points and avoid unnecessary details."
-    ),
-    "normal": ("give only code and any minimal stuff put in code comments"
-        
-    ),
-    "technical": (
-        "Explain the concept with a focus on the technical aspects. Use precise terminology and assume the reader "
-        "has an intermediate to advanced understanding of coding and related technologies. Include code snippets and formal definitions where applicable.All of this should ideally be wrapped in the code onyl and using  the ''' "
-    ),
-    "expert": (
-        "Deliver an advanced explanation of the concept with references to cutting-edge techniques, research, or standards. "
-        "Assume the reader is highly experienced in coding and wants a deep dive into the nuances, optimizations, and trade-offs. All of this should ideally be wrapped in the code onyl and using  the ''' "
-    ),
-    "creative": (
-        "Explain the concept in an engaging, imaginative way. Use  metaphors, or analogies to make the explanation memorable and fun. "
-        "Include examples that showcase creativity and out-of-the-box thinking. any explainations shoudl be through code comments or in rare cases through ''' "
-    )
-}
+    
+    mode_def = {
+        "beginnerfriendly": "Explain the concept in the simplest terms possible. Use relatable analogies, step-by-step explanations, and avoid technical jargon.",
+        "detailed": "Provide an in-depth explanation of the concept, including all relevant details, context, and examples. Cover edge cases, best practices, and common pitfalls.",
+        "concise": "Explain the concept in as few words as possible while still being clear and accurate. Focus only on the key points and avoid unnecessary details.",
+        "normal": "Explain the concept briefly, including only the essential points.",
+        "technical": "Explain the concept with a focus on the technical aspects. Use precise terminology and assume the reader has an intermediate to advanced understanding of coding and related technologies.",
+        "expert": "Deliver an advanced explanation of the concept with references to cutting-edge techniques, research, or standards. Assume the reader is highly experienced in coding and wants a deep dive into the nuances, optimizations, and trade-offs.",
+        "creative": "Explain the concept in an engaging, imaginative way. Use metaphors, or analogies to make the explanation memorable and fun. Include examples that showcase creativity and out-of-the-box thinking."
+    }
+    
     current_persona = mode_def[mode]
     print(f"Persona set to: {mode}")
 
@@ -121,6 +193,7 @@ def get_persona():
     - str: The current mode.
     """
     return current_persona
+
 
 
 
@@ -284,7 +357,7 @@ def analyze_code(code: str) -> Dict[str, Any]:
       - All relevant usage labels from ANY parent node in the chain,
         e.g. "loop_usage", "conditional_usage", "arithmetic", "function_call", etc.
     """
-    global context
+    global context_tree
     context_tree = {
         "functions": {},
         "classes": {}
@@ -453,7 +526,7 @@ def get_notebook_path() -> str:
                     if session["kernel"]["id"] == kernel_id:
                         return os.path.join(server["root_dir"], session["notebook"]["path"])
             except Exception as e:
-                print(f"Error fetching sessions from server: {e}")
+                
                 continue
 
         raise RuntimeError("Could not find the notebook path.")
