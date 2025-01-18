@@ -60,8 +60,8 @@ def call_openai(prompt: str) -> str:
             json=data
         )
         response.raise_for_status()
-        this_is_so_bs = response.json()["choices"][0]["message"]["content"].strip()
-        return clean_code_output(this_is_so_bs)
+        
+        return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         logger.error(f"OpenAI API error: {e}")
         return f"Error: {str(e)}"
@@ -88,7 +88,7 @@ def call_anthropic(prompt: str) -> str:
             json=data
         )
         response.raise_for_status()
-        return clean_code_output(response.json()["content"][0]["text"].strip())
+        return response.json()["content"][0]["text"].strip()
     except Exception as e:
         logger.error(f"Anthropic API error: {e}")
         return f"Error: {str(e)}"
@@ -102,7 +102,7 @@ def call_gemini(prompt: str) -> str:
         model = genai.GenerativeModel(config.api_keys["gemini"]["model"])
         response = model.generate_content(prompt)
         test = response.text.strip()
-        return display_highlighted_code(test)
+        return test
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
         return f"Error: {str(e)}"
@@ -187,7 +187,7 @@ def call_local_transformers(prompt: str) -> str:
         )
         response = config.local_tokenizer.decode(outputs[0], skip_special_tokens=True)
         this_is_bs = response[len(prompt):].strip()
-        return clean_code_output(this_is_bs)
+        return this_is_bs
     except Exception as e:
         return f"Local Transformers Error: {str(e)}"
 
@@ -210,6 +210,6 @@ def call_huggingface_hub(prompt: str) -> str:
             do_sample=True,
             return_full_text=False
         )
-        return clean_code_output(result.strip())
+        return result.strip()
     except Exception as e:
         return f"HuggingFace Hub Error: {str(e)}"
