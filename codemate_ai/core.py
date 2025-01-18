@@ -9,6 +9,8 @@ from nbformat import NotebookNode
 from jupyter_server.serverapp import list_running_servers
 import astor
 from IPython.display import HTML, display
+import ast
+
 
 from pygments import highlight
 from pygments.lexers import PythonLexer
@@ -159,42 +161,276 @@ def clean_code_output(text: str) -> str:
     # Display formatted code
     display(Code(text, language='python'))
 
+
+
 def print_context_summary():
-    """Display the current context tree in formatted form."""
+    """Display the current context tree in a formatted form."""
     from IPython.display import display, Code
+    
+    # Ensure we have a context_tree in scope
+    global context_tree
     
     if not context_tree:
         print("No context available. Use %analyze_code first.")
         return
-        
-    context_summary = "\n".join([
-        f"Function: {func}\nVariables: {', '.join(details['variables'])}\nBody:\n{details['body']}"
-        for func, details in context_tree.items()
-    ])
+    
+    summary_lines = []
+    
+    # 1) Summarize functions
+    functions_dict = context_tree.get("functions", {})
+    if functions_dict:
+        summary_lines.append("=== Functions ===")
+        for func_name, func_info in functions_dict.items():
+            summary_lines.append(f"Function: {func_name}")
+            
+            # Parameters
+            params = func_info.get("params", [])
+            if params:
+                summary_lines.append(f"  Params: {', '.join(params)}")
+            
+            # Docstring
+            docstring = func_info.get("docstring", "")
+            if docstring:
+                summary_lines.append(f"  Docstring: {docstring}")
+            
+            # Variables
+            var_info = func_info.get("variables", {})
+            if var_info:
+                summary_lines.append("  Variables:")
+                for var_name, usage_list in var_info.items():
+                    usage_str = ", ".join(usage_list)
+                    summary_lines.append(f"    {var_name} -> {usage_str}")
+            
+            summary_lines.append("")  # Blank line
+    
+    # 2) Summarize classes
+    classes_dict = context_tree.get("classes", {})
+    if classes_dict:
+        summary_lines.append("=== Classes ===")
+        for class_name, class_info in classes_dict.items():
+            summary_lines.append(f"Class: {class_name}")
+            
+            # Class docstring
+            class_doc = class_info.get("docstring", "")
+            if class_doc:
+                summary_lines.append(f"  Docstring: {class_doc}")
+            
+            # Methods
+            methods_dict = class_info.get("methods", {})
+            for method_name, method_info in methods_dict.items():
+                summary_lines.append(f"  Method: {method_name}")
+                
+                # Method params
+                method_params = method_info.get("params", [])
+                if method_params:
+                    summary_lines.append(f"    Params: {', '.join(method_params)}")
+                
+                # Method docstring
+                method_doc = method_info.get("docstring", "")
+                if method_doc:
+                    summary_lines.append(f"    Docstring: {method_doc}")
+                
+                # Variables in the method
+                method_vars = method_info.get("variables", {})
+                if method_vars:
+                    summary_lines.append("    Variables:")
+                    for var_name, usage_list in method_vars.items():
+                        usage_str = ", ".join(usage_list)
+                        summary_lines.append(f"      {var_name} -> {usage_str}")
+                
+                summary_lines.append("")  # Blank line
+    
+    # 3) If no functions/classes found, look for a 'no_definitions' entry
+    if "no_definitions" in context_tree:
+        no_def_message = context_tree["no_definitions"].get("message", "")
+        summary_lines.append("=== No Definitions ===")
+        summary_lines.append(no_def_message)
+    
+    # Join everything
+    context_summary = "\n".join(summary_lines).strip()
+    
+    if not context_summary:
+        context_summary = "No content to display."
     
     print("Context Summary:")
     display(Code(context_summary, language='python'))
 
+
+
+
+
+
+
+
+def create_parent_map(node: ast.AST) -> Dict[ast.AST, ast.AST]:
+    """
+    Recursively build a dictionary mapping each node to its direct parent node.
+    """
+    parent_map = {}
+    for child in ast.iter_child_nodes(node):
+        parent_map[child] = node
+        parent_map.update(create_parent_map(child))
+    return parent_map
+
 def analyze_code(code: str) -> Dict[str, Any]:
-    """Parse code and extract a context tree."""
-    
-    context_tree = {}
+    """
+    Parse code to extract:
+      - Top-level functions: name, params, docstring, variables + usage context
+      - Top-level classes: docstring, methods (same details)
+      - If no functions or classes, store 'no_definitions' placeholder.
+
+    For each variable, we gather:
+      - "read" / "write" / "delete" from child.ctx (Load, Store, Del)
+      - All relevant usage labels from ANY parent node in the chain,
+        e.g. "loop_usage", "conditional_usage", "arithmetic", "function_call", etc.
+    """
+    global context
+    context_tree = {
+        "functions": {},
+        "classes": {}
+    }
+    found_any_definitions = False
+
+    # Extend usage_map to include loops and conditionals (plus existing ops).
+    usage_map = {
+        ast.BinOp: "arithmetic",
+        ast.Call: "function_call",
+        ast.Compare: "comparison",
+        ast.Subscript: "index",
+        ast.Return: "return_value",
+        ast.For: "loop_usage",
+        ast.While: "loop_usage",
+        ast.If: "conditional_usage",
+        ast.IfExp: "conditional_usage",
+    }
+
     try:
         tree = ast.parse(code)
-        for node in ast.walk(tree):
+
+        # Helper function to gather usage labels from all parents
+        def gather_parent_usage_labels(node_name: ast.Name, parent_dict: Dict[ast.AST, ast.AST]) -> set:
+            """
+            Given an ast.Name node and a parent map, climb up the chain
+            and collect all relevant usage labels (loop_usage, conditional_usage, etc.).
+            """
+            labels = set()
+            current = node_name
+
+            # Walk up until we have no parent or we've hit the root
+            while current in parent_dict:
+                current = parent_dict[current]
+                label = usage_map.get(type(current), None)
+                if label:
+                    labels.add(label)
+
+            return labels
+
+        # Iterate over top-level nodes (functions, classes, etc.)
+        for node in ast.iter_child_nodes(tree):
+            # 1) Top-level Functions
             if isinstance(node, ast.FunctionDef):
+                found_any_definitions = True
+
                 func_name = node.name
-                variables = set()
+                params = [arg.arg for arg in node.args.args]
+                docstring = ast.get_docstring(node)
+
+                # Create a parent map inside this function
+                func_parents = create_parent_map(node)
+                var_usage = {}
+
+                # Walk the function AST
                 for child in ast.walk(node):
                     if isinstance(child, ast.Name):
-                        variables.add(child.id)
-                context_tree[func_name] = {
-                    "variables": list(variables),
-                    "body": astor.to_source(node)
+                        var_name = child.id
+                        if var_name not in var_usage:
+                            var_usage[var_name] = set()
+
+                        # (1) Read/Write/Delete
+                        usage_type = type(child.ctx).__name__  # "Load", "Store", or "Del"
+                        if usage_type == "Store":
+                            var_usage[var_name].add("write")
+                        elif usage_type == "Load":
+                            var_usage[var_name].add("read")
+                        elif usage_type == "Del":
+                            var_usage[var_name].add("delete")
+
+                        # (2) Gather *all* parent usage labels
+                        parent_labels = gather_parent_usage_labels(child, func_parents)
+                        var_usage[var_name].update(parent_labels)
+
+                # Convert sets to lists for JSON-friendly structure
+                var_usage = {k: list(v) for k, v in var_usage.items()}
+
+                context_tree["functions"][func_name] = {
+                    "params": params,
+                    "docstring": docstring,
+                    "variables": var_usage
                 }
+
+            # 2) Top-level Classes
+            elif isinstance(node, ast.ClassDef):
+                found_any_definitions = True
+
+                class_name = node.name
+                class_docstring = ast.get_docstring(node)
+                methods = {}
+
+                for subnode in node.body:
+                    if isinstance(subnode, ast.FunctionDef):
+                        method_name = subnode.name
+                        method_params = [arg.arg for arg in subnode.args.args]
+                        method_doc = ast.get_docstring(subnode)
+
+                        # Create a parent map for this method
+                        method_parents = create_parent_map(subnode)
+                        method_vars = {}
+
+                        # Walk the method AST
+                        for grandchild in ast.walk(subnode):
+                            if isinstance(grandchild, ast.Name):
+                                var_name = grandchild.id
+                                if var_name not in method_vars:
+                                    method_vars[var_name] = set()
+
+                                # (1) Read/Write/Delete
+                                usage_type = type(grandchild.ctx).__name__
+                                if usage_type == "Store":
+                                    method_vars[var_name].add("write")
+                                elif usage_type == "Load":
+                                    method_vars[var_name].add("read")
+                                elif usage_type == "Del":
+                                    method_vars[var_name].add("delete")
+
+                                # (2) Gather *all* parent usage labels
+                                parent_labels = gather_parent_usage_labels(grandchild, method_parents)
+                                method_vars[var_name].update(parent_labels)
+
+                        method_vars = {k: list(v) for k, v in method_vars.items()}
+                        methods[method_name] = {
+                            "params": method_params,
+                            "docstring": method_doc,
+                            "variables": method_vars
+                        }
+
+                context_tree["classes"][class_name] = {
+                    "docstring": class_docstring,
+                    "methods": methods
+                }
+
+        # 3) If code has no functions/classes, store a placeholder
+        if not found_any_definitions:
+            context_tree["no_definitions"] = {
+                "message": "No functions or classes found in the code."
+            }
+
     except Exception as e:
         print(f"Error parsing code: {e}")
+
     return context_tree
+
+
+
 
 
 def get_notebook_path() -> str:
