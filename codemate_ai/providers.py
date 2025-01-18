@@ -7,7 +7,7 @@ import requests
 import json
 from typing import Optional, Dict, Any
 import logging
-from .core import clean_code_output, styled_code,display_highlighted_code
+from codemate_ai.core import clean_code_output, styled_code,display_highlighted_code
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
