@@ -533,7 +533,7 @@ class CodeAssistMagics(Magics):
             print("\nGenerated test code:")
             display_highlighted_code(code)
 
-    @staticmethod
+    
     def _call_provider(self, prompt):
         """Helper method to call the configured LLM provider."""
         if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
