@@ -73,6 +73,10 @@ Use an already downloaded model:
 %%debug_cell: Debug a cell with AI assistance.
 %set_code_theme: Change the background theme of the code solutions.
 %set_persona: Change the LLM behaviour to various types including but not limited to detailed, consise, beginnerfriendly etc.
+%%refactor_code: Refactors code for modern best practices.
+%%explain_code: Cell magic to generate detailed explanation of code.
+%%optimize_code: Cell magic to suggest performance optimizations for code.
+%%generate_test: Cell magic to generate unit tests for code.
 ```
 To understand each individual magic command functionality and operations, see [Magic function Documentation](magic_func_documentation.md).
 
