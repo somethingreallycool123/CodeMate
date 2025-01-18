@@ -1,12 +1,12 @@
 from IPython.core.magic import Magics, magics_class, line_magic, cell_magic
 from IPython.display import display, Code
-from . import providers
-from . import core
+from codemate_ai import providers
+from codemate_ai import core
 import sys
 from io import StringIO
 import traceback
-from .providers import config, LLMProvider,call_openai,call_gemini,call_anthropic,call_local_transformers,call_huggingface_hub
-from .core import clean_code_output,set_style,set_persona,get_persona
+from codemate_ai.providers import config, LLMProvider,call_openai,call_gemini,call_anthropic,call_local_transformers,call_huggingface_hub
+from codemate_ai.core import clean_code_output,set_style,set_persona,get_persona,print_context_summary
 
 @magics_class
 class CodeAssistMagics(Magics):
@@ -110,7 +110,7 @@ class CodeAssistMagics(Magics):
                 return "No model path provided."
 
         if model_path is not None:
-            return f"Provider set to {provider_name}. Model set to {model_path}"
+            return f"Provider set to {provider_name}. Model set to {model_path} "
         else:
             return f"Provider set to {provider_name}"
 
@@ -118,24 +118,91 @@ class CodeAssistMagics(Magics):
 
     @line_magic
     def analyze_code(self, line):
-        """Analyze code in the current notebook."""
+        """
+        Analyze code in the current notebook using core.analyze_code
+        and store a global `context_tree`. 
+        Returns a short textual summary.
+        """
         notebook_path = line.strip() if line else core.get_notebook_path()
         if not notebook_path:
             return "Could not determine notebook path"
-            
+
         try:
             code = core.extract_code_from_notebook(notebook_path)
-            
+
             global context_tree
             context_tree = core.analyze_code(code)
-            context_summary = "\n".join([
-                f"Function: {func}\nVariables: {', '.join(details['variables'])}\nBody:\n{details['body']}"
-                for func, details in context_tree.items()
-            ])
-            
-            return "Code analysis complete"
+
+            # Build a textual summary from the new structure
+            summary_lines = []
+
+            # 1) Check if we have "functions"
+            functions_dict = context_tree.get("functions", {})
+            for func_name, func_info in functions_dict.items():
+                summary_lines.append(f"Function: {func_name}")
+                if func_info.get("params"):
+                    summary_lines.append(f"  Params: {', '.join(func_info['params'])}")
+                if func_info.get("docstring"):
+                    summary_lines.append(f"  Docstring: {func_info['docstring']}")
+                
+                # Variables are typically a dict { var_name: [usage_labels] }
+                if "variables" in func_info:
+                    summary_lines.append("  Variables:")
+                    for var_name, usage_list in func_info["variables"].items():
+                        usage_str = ", ".join(usage_list)
+                        summary_lines.append(f"    {var_name} -> {usage_str}")
+
+                summary_lines.append("")  # blank line for spacing
+
+            # 2) Check if we have "classes"
+            classes_dict = context_tree.get("classes", {})
+            for class_name, class_info in classes_dict.items():
+                summary_lines.append(f"Class: {class_name}")
+                if class_info.get("docstring"):
+                    summary_lines.append(f"  Docstring: {class_info['docstring']}")
+
+                # Each class might have multiple methods
+                methods_dict = class_info.get("methods", {})
+                for method_name, method_info in methods_dict.items():
+                    summary_lines.append(f"  Method: {method_name}")
+                    if method_info.get("params"):
+                        summary_lines.append(f"    Params: {', '.join(method_info['params'])}")
+                    if method_info.get("docstring"):
+                        summary_lines.append(f"    Docstring: {method_info['docstring']}")
+
+                    # Variables for each method
+                    if "variables" in method_info:
+                        summary_lines.append("    Variables:")
+                        for var_name, usage_list in method_info["variables"].items():
+                            usage_str = ", ".join(usage_list)
+                            summary_lines.append(f"      {var_name} -> {usage_str}")
+
+                summary_lines.append("")  # blank line for spacing
+
+            # 3) If we have no definitions at all
+            if "no_definitions" in context_tree:
+                message = context_tree["no_definitions"].get("message", "")
+                summary_lines.append(message)
+
+            # Create the final summary text
+            context_summary = "\n".join(summary_lines).strip()
+            return "Code analysis complete.\n\n" + (context_summary or "No content to display.")
+
         except Exception as e:
             return f"Error analyzing code: {e}"
+
+    @line_magic
+    def show_context_summary(self, line):
+        """
+        Magic line command to display the current context tree in a formatted form.
+        """
+        # Assuming print_context_summary() and context_tree are in scope
+        # or imported from your 'core' module
+        if 'print_context_summary' in globals():
+            print_context_summary()
+        else:
+            print("print_context_summary() is not defined in the current scope.")
+
 
 
     @line_magic
