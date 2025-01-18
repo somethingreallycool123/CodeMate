@@ -1,12 +1,20 @@
 from IPython.core.magic import Magics, magics_class, line_magic, cell_magic
-from IPython.display import display, Code
+from IPython.display import display, Code, Markdown,HTML,clear_output
+import time
 from codemate_ai import providers
 from codemate_ai import core
 import sys
+import itertools
 from io import StringIO
 import traceback
 from codemate_ai.providers import config, LLMProvider,call_openai,call_gemini,call_anthropic,call_local_transformers,call_huggingface_hub
-from codemate_ai.core import clean_code_output,set_style,set_persona,get_persona,print_context_summary
+from codemate_ai.core import clean_code_output,set_style,set_persona,get_persona,print_context_summary,display_highlighted_code
+import inspect
+import traceback
+import cProfile
+import pstats
+from io import StringIO
+
 
 @magics_class
 class CodeAssistMagics(Magics):
@@ -117,7 +125,7 @@ class CodeAssistMagics(Magics):
 
 
     @line_magic
-    def analyze_code(self, line):
+    def analyze_code(self,line):
         """
         Analyze code in the current notebook using core.analyze_code
         and store a global `context_tree`. 
@@ -186,7 +194,7 @@ class CodeAssistMagics(Magics):
 
             # Create the final summary text
             context_summary = "\n".join(summary_lines).strip()
-            return "Code analysis complete.\n\n" + (context_summary or "No content to display.")
+            return "Code analysis complete.\n"
 
         except Exception as e:
             return f"Error analyzing code: {e}"
@@ -202,47 +210,114 @@ class CodeAssistMagics(Magics):
             print_context_summary()
         else:
             print("print_context_summary() is not defined in the current scope.")
+       
 
+
+    @staticmethod
+    def _split_code_and_explanation(response):
+        """
+        Split the LLM response into code and explanation text.
+
+        Parameters:
+        - response (str): The response from the LLM.
+
+        Returns:
+        - tuple: (code, explanation)
+        """
+        lines = response.splitlines()
+        code_lines = []
+        explanation_lines = []
+        is_code_block = False
+
+        for line in lines:
+            # Detect code blocks (enclosed in triple backticks)
+            if line.strip().startswith("```"):
+                is_code_block = not is_code_block
+                continue
+
+            # Append to code or explanation based on current block
+            if is_code_block:
+                code_lines.append(line)
+            else:
+                explanation_lines.append(line)
+
+        code = "\n".join(code_lines).strip()
+        explanation = "\n".join(explanation_lines).strip()
+        return code, explanation
+    
+    @staticmethod
+    def analyze_codebase_fancy():
+        """
+        Displays a fancy message while analyzing the codebase.
+        """
+        message = [
+            "🔍 Scanning your project...",
+            "🛠️  Parsing functions, classes, and modules...",
+            "⚙️  Building context tree...",
+            "📊  Generating brilliance! "
+        ]
+        
+        for line in message:
+            display(line)
+            time.sleep(1.5)
+            clear_output(wait=True)
 
 
     @line_magic
     def generate_code(self, line):
-        """Magic command to generate code."""
+        """Magic command to generate code and display it properly with explanations."""
         if not config.provider:
             return "Please set up a provider first using %set_llm_provider"
 
         function_name = line.strip()
-        if not context_tree:
-            return "Context tree not built. Use %analyze_code '<notebook_path>' to build it."
         
+        
+                
+        self.analyze_codebase_fancy()
+        self.shell.run_line_magic('analyze_code', None)    
+        # Get the current persona (mode)
         current_persona = get_persona()
-        
-        
-        prompt = f"Generate Python code for a function named '{function_name}' considering the context of the codebase provided: {context_tree}.{current_persona}. No need to mention you have been provided context about the whole code "
 
+        # Construct the prompt
+        prompt = (
+            f"Generate Python code for a function named '{function_name}' considering the context of the codebase provided: {context_tree}. {current_persona}"
+        )
 
-        
-
+        # Call the appropriate LLM provider
         if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
-            return call_local_transformers(prompt)
+            response = call_local_transformers(prompt)
         elif config.provider == LLMProvider.TRANSFORMERS_HUB:
-            return call_huggingface_hub(prompt)
+            response = call_huggingface_hub(prompt)
         elif config.provider == LLMProvider.OPENAI:
-            return call_openai(prompt)
+            response = call_openai(prompt)
         elif config.provider == LLMProvider.ANTHROPIC:
-            return call_anthropic(prompt)
+            response = call_anthropic(prompt)
         elif config.provider == LLMProvider.GEMINI:
-            return call_gemini(prompt)
+            response = call_gemini(prompt)
         elif config.provider == LLMProvider.TRANSFORMERS_DOWNLOAD:
-            return call_local_transformers(prompt)  
+            response = call_local_transformers(prompt)
         else:
-            return "Provider not implemented" 
+            return "Provider not implemented"
+
+        # Split response into code and text explanation
+        code, explanation = self._split_code_and_explanation(response)
+
+        # Display the code with syntax highlighting
+        if code:
+            display_highlighted_code(code)
+
+        # Display the explanation as Markdown
+        if explanation:
+            display(Markdown(explanation))
+
+ 
 
 
+    
     @cell_magic
     def debug_cell(self, line, cell):
-        """Debug a cell with AI assistance."""
-        if not providers.config.provider:
+        """Debug a cell with AI assistance and display results with proper formatting."""
+        if not config.provider:
             return "Please set up a provider first using %set_llm_provider"
         
         # Capture output and errors
@@ -262,36 +337,216 @@ class CodeAssistMagics(Magics):
         
         if error_msg:
             print("\nAnalyzing error and suggesting solutions...")
+            
+            # Analyze codebase for context, similar to generate_code
+            self.analyze_codebase_fancy()
+            self.shell.run_line_magic('analyze_code', None)
+            
+            # Get current persona
             current_persona = get_persona()
+            
             prompt = f"""Given this Python code:
-
     {cell}
-
     The code produced this error:
     {error_msg}
-
-    only use the context tree if necessary: 
-
+    Consider the context of the codebase if relevant:
     {context_tree}
-
-    {current_persona} and give corrected code
-    """
+    {current_persona}
+    Please provide:
+    1. A clear explanation of the error
+    2. The corrected code
+    3. Additional debugging tips if relevant"""
             
-            provider = providers.config.provider
-            if provider == providers.LLMProvider.OPENAI:
-                suggestion = providers.call_openai(prompt)
-            elif provider == providers.LLMProvider.ANTHROPIC:
-                suggestion = providers.call_anthropic(prompt)
-            elif provider == providers.LLMProvider.GEMINI:
-                suggestion = providers.call_gemini(prompt)
-            elif provider in (providers.LLMProvider.TRANSFORMERS_LOCAL, providers.LLMProvider.TRANSFORMERS_DOWNLOAD):
-                suggestion = providers.generate_with_model(prompt)
+            # Call the appropriate LLM provider
+            if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
+                response = call_local_transformers(prompt)
+            elif config.provider == LLMProvider.TRANSFORMERS_HUB:
+                response = call_huggingface_hub(prompt)
+            elif config.provider == LLMProvider.OPENAI:
+                response = call_openai(prompt)
+            elif config.provider == LLMProvider.ANTHROPIC:
+                response = call_anthropic(prompt)
+            elif config.provider == LLMProvider.GEMINI:
+                response = call_gemini(prompt)
+            elif config.provider == LLMProvider.TRANSFORMERS_DOWNLOAD:
+                response = call_local_transformers(prompt)
             else:
-                suggestion = "Provider not implemented"
+                return "Provider not implemented"
             
-            print("\nAI Suggestion:")
-            print(suggestion)
+            # Split response into code and explanation
+            code, explanation = self._split_code_and_explanation(response)
+            
+            # Display the explanation as Markdown first
+            if explanation:
+                display(Markdown(explanation))
+            
+            # Display the corrected code with syntax highlighting
+            if code:
+                print("\nCorrected code:")
+                display_highlighted_code(code)
         else:
             output = stdout_capture.getvalue()
             if output:
-                print("Output:", output)
+                print("Code executed successfully. Output:", output)
+            else:
+                print("Code executed successfully with no output.")
+
+
+    @cell_magic
+    def refactor_code(self, line, cell):
+        """Cell magic to suggest code refactoring improvements."""
+        if not config.provider:
+            return "Please set up a provider first using %set_llm_provider"
+        
+        # Analyze current codebase
+        self.analyze_codebase_fancy()
+        self.shell.run_line_magic('analyze_code', None)
+        current_persona = get_persona()
+        
+        prompt = f"""Analyze this Python code and suggest refactoring improvements:
+    {cell}
+
+    Consider the broader codebase context:
+    {context_tree}
+
+    {current_persona}
+
+    Please suggest:
+    1. Code quality improvements
+    2. Performance optimizations
+    3. Better design patterns
+    4. Refactored code implementation"""
+
+        # Call appropriate provider and display results
+        response = self._call_provider(prompt)
+        code, explanation = self._split_code_and_explanation(response)
+        
+        if explanation:
+            display(Markdown(explanation))
+        if code:
+            print("\nRefactored code suggestion:")
+            display_highlighted_code(code)
+
+    @cell_magic
+    def explain_code(self, line, cell):
+        """Cell magic to generate detailed explanation of code."""
+        if not config.provider:
+            return "Please set up a provider first using %set_llm_provider"
+        
+        current_persona = get_persona()
+        prompt = f"""Explain this Python code in detail:
+    {cell}
+
+    {current_persona}
+
+    Please provide:
+    1. High-level overview
+    2. Line-by-line explanation
+    3. Key design decisions
+    4. Usage examples"""
+        
+        response = self._call_provider(prompt)
+        display(Markdown(response))
+
+        
+
+    @cell_magic
+    def optimize_code(self, line, cell):
+            """Magic command to suggest performance optimizations for code."""
+            if not config.provider:
+                return "Please set up a provider first using %set_llm_provider"
+            
+            # Run the code and profile it
+            profiler = cProfile.Profile()
+            stdout_capture = StringIO()
+            stderr_capture = StringIO()
+            
+            sys.stdout = stdout_capture
+            sys.stderr = stderr_capture
+            
+            try:
+                profiler.runctx(cell, self.shell.user_ns, {})
+                stats = pstats.Stats(profiler)
+                profile_output = StringIO()
+                stats.sort_stats('cumulative').print_stats(20)
+                profile_data = profile_output.getvalue()
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+            
+            current_persona = get_persona()
+            prompt = f"""Analyze this Python code and its performance profile:
+
+        Code:
+        {cell}
+
+        Profile results:
+        {profile_data}
+
+        {current_persona}
+
+        Please suggest:
+        1. Performance bottlenecks
+        2. Optimization strategies
+        3. Optimized implementation
+        4. Benchmarking comparisons"""
+            
+            response = self._call_provider(prompt)
+            code, explanation = self._split_code_and_explanation(response)
+            
+            if explanation:
+                display(Markdown(explanation))
+            if code:
+                print("\nOptimized code suggestion:")
+                display_highlighted_code(code)
+
+    @cell_magic
+    def generate_test(self, line, cell):
+        """Cell magic to generate unit tests for code."""
+        if not config.provider:
+            return "Please set up a provider first using %set_llm_provider"
+        
+        self.analyze_codebase_fancy()
+        current_persona = get_persona()
+        
+        prompt = f"""Generate comprehensive unit tests for this Python code:
+    {cell}
+
+    Consider the codebase context:
+    {context_tree}
+
+    {current_persona}
+
+    Please provide:
+    1. Test cases covering main functionality
+    2. Edge cases
+    3. Error cases
+    4. Mocking examples if needed
+    5. Complete test implementation"""
+        
+        response = self._call_provider(prompt)
+        code, explanation = self._split_code_and_explanation(response)
+        
+        if explanation:
+            display(Markdown(explanation))
+        if code:
+            print("\nGenerated test code:")
+            display_highlighted_code(code)
+
+    @staticmethod
+    def _call_provider(self, prompt):
+        """Helper method to call the configured LLM provider."""
+        if config.provider == LLMProvider.TRANSFORMERS_LOCAL:
+            return call_local_transformers(prompt)
+        elif config.provider == LLMProvider.TRANSFORMERS_HUB:
+            return call_huggingface_hub(prompt)
+        elif config.provider == LLMProvider.OPENAI:
+            return call_openai(prompt)
+        elif config.provider == LLMProvider.ANTHROPIC:
+            return call_anthropic(prompt)
+        elif config.provider == LLMProvider.GEMINI:
+            return call_gemini(prompt)
+        elif config.provider == LLMProvider.TRANSFORMERS_DOWNLOAD:
+            return call_local_transformers(prompt)
+        else:
+            return "Provider not implemented"           
