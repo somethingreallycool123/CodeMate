@@ -14,7 +14,7 @@
 
 ## Installation
 
-Install CodeAssist via `pip`:
+Install CodeMate via `pip`:
 
 ```bash
 pip install codemate_ai
@@ -57,18 +57,13 @@ Use an already downloaded model:
 
 %set_llm_provider transformers_local ./models/my_model
 ```
-### Analyze your notebook's code context:
-```python
 
-%analyze_code
-```
 
 ### Magic Commands
 ```markdown
 
 %set_api_key: Set API keys for different providers.
 %set_llm_provider: Configure the LLM provider (e.g., OpenAI, Anthropic, or local models).
-%analyze_code: Analyze and build context from your notebook’s code.
 %generate_code: Generate new code based on the current context.
 %%debug_cell: Debug a cell with AI assistance.
 %set_code_theme: Change the background theme of the code solutions.
@@ -95,11 +90,7 @@ OR
 ```python
 %set_llm_provider transformers_local ./models/my_model
 ```
-Analyze the current notebook:
-```python
 
-%analyze_code
-```
 Generate a new function:
 ```python
 
@@ -113,6 +104,7 @@ def process_data(df):
     result = df.groupby('category').mean()
     return result['value'] / 0  # Intentional error
 ```
+
 Change the background theme:
 ```python
 %set_code_theme rrt
