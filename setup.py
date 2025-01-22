@@ -1,6 +1,9 @@
 from setuptools import setup, find_packages
 import pathlib
 
+current_dir = pathlib.Path(__file__).parent
+long_description = (current_dir / "README.md").read_text()
+
 setup(
     name="codemate_ai",
     version="0.1.3",
