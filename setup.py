@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="codemate_ai",
-    version="0.1.1",
+    version="0.1.2",
     author="Manan Gupta",
     author_email="manangupta9901@gmail.com",
     description="CodeMate",
