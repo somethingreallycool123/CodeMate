@@ -25,7 +25,7 @@ except Exception as e:
 
 setup(
     name="codemate_ai",
-    version="0.1.3",
+    version="0.1.4",
     author="Manan Gupta",
     author_email="manangupta9901@gmail.com",
     description="CodeMate",
