@@ -1,8 +1,14 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="codemate_ai",  
-    version="0.1.1",    
+    name="codemate_ai",
+    version="0.1.1",
+    author="Manan Gupta",
+    author_email="manangupta9901@gmail.com",
+    description="CodeMate",
+    long_description=long_description,
+    long_description_content_type="text/markdown",  # Set to Markdown
+    url="https://github.com/yourusername/codemate-ai",
     packages=find_packages(),  
     install_requires=[  
         "torch",
