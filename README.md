@@ -19,7 +19,7 @@ Install CodeMate via `pip`:
 ```bash
 pip install codemate_ai
 ```
-Install CodeAssist via git clone:
+Install CodeMate via git clone:
 ```bash
 git clone https://github.com/somethingreallycool123/CodeMate.git
 
@@ -37,7 +37,7 @@ git clone https://github.com/somethingreallycool123/CodeMate.git
 #### For API-based LLMs (OpenAI, Anthropic, Google Gemini, etc): 
 
 ```python
-%set_llm_provider <provider_name>
+%set_llm_provider <provider_name> <model>
 %set_api_key <provider_name> <YOUR_API_KEY>
 
 ```
