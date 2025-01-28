@@ -2,6 +2,8 @@
 
 **CodeMate** is a Jupyter notebook extension that leverages powerful AI models for code assistance, debugging, and generation. It supports multiple Large Language Model (LLM) providers, including OpenAI, Anthropic, Google Gemini, and local models via Hugging Face, bringing a versatile range of tools right to your coding environment.
 
+###Note: Currently CodeMate only supports jupyter notebooks running locally, however, support for kaggle notebooks and colab is coming very soon!
+
 ## Features
 
 - 🤖 **Multiple LLM Provider Support**: Seamlessly integrate with OpenAI, Anthropic Claude, Google Gemini, and Hugging Face.
