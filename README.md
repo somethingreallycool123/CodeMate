@@ -16,7 +16,7 @@
 
 ## Installation
 
-### Note: Currently CodeMate only supports jupyter notebooks running locally, however, support for kaggle notebooks and colab is coming very soon!
+##### Note: Currently CodeMate only supports jupyter notebooks running locally, however, support for kaggle notebooks and colab is coming very soon!
 
 Install CodeMate via `pip`:
 
