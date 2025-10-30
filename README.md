@@ -1,4 +1,4 @@
-# CodeMate: AI-Powered Jupyter Notebook Assistant
+# CodeMate: AI Native Jupyter Notebook Alternative
 
 **CodeMate** is a Jupyter notebook extension that leverages powerful AI models for code assistance, debugging, and generation. It supports multiple Large Language Model (LLM) providers, including OpenAI, Anthropic, Google Gemini, and local models via Hugging Face, bringing a versatile range of tools right to your coding environment.
 
@@ -150,4 +150,5 @@ For inquiries, please contact us via:
  Email: [manangupta9901@gmail.com]
  
  GitHub: somethingreallycool123
+
 
